@@ -24,20 +24,21 @@ Examples
   cryptocmd -c SOL --rows 5 --ascending
 """
 
-from __future__ import annotations
+from __future__ import print_function
 
 import argparse
 import json
 import os
 import sys
 from datetime import datetime
+from typing import List, Optional
 
-from .core import CmcScraper
 from .__version__ import __version__
+from .core import CmcScraper
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Constants
 # ---------------------------------------------------------------------------
 
 SUPPORTED_EXPORT_FORMATS = (
@@ -54,30 +55,38 @@ SUPPORTED_EXPORT_FORMATS = (
 )
 
 
-def _validate_date(date_str: str) -> str:
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _validate_date(date_str):
+    # type: (str) -> str
     """Validate that a date string matches dd-mm-yyyy."""
     try:
         datetime.strptime(date_str, "%d-%m-%Y")
     except ValueError:
         raise argparse.ArgumentTypeError(
-            f"Invalid date '{date_str}'. Expected format: dd-mm-yyyy (e.g. 01-01-2023)"
+            "Invalid date '{}'. Expected format: dd-mm-yyyy (e.g. 01-01-2023)".format(
+                date_str
+            )
         )
     return date_str
 
 
-def _print_table(headers: list, rows: list, max_rows: int | None = None) -> None:
+def _print_table(headers, rows, max_rows=None):
+    # type: (List[str], List[list], Optional[int]) -> None
     """Pretty-print rows as an aligned ASCII table."""
     if max_rows is not None:
         rows = rows[:max_rows]
 
-    # Calculate column widths
     col_widths = [len(h) for h in headers]
     for row in rows:
         for i, cell in enumerate(row):
             col_widths[i] = max(col_widths[i], len(str(cell)))
 
     sep = "+" + "+".join("-" * (w + 2) for w in col_widths) + "+"
-    fmt = "|" + "|".join(f" {{:<{w}}} " for w in col_widths) + "|"
+    fmt = "|" + "|".join(" {:<" + str(w) + "} " for w in col_widths) + "|"
 
     print(sep)
     print(fmt.format(*headers))
@@ -85,10 +94,11 @@ def _print_table(headers: list, rows: list, max_rows: int | None = None) -> None
     for row in rows:
         print(fmt.format(*[str(c) for c in row]))
     print(sep)
-    print(f"  {len(rows)} row(s) displayed.")
+    print("  {} row(s) displayed.".format(len(rows)))
 
 
-def _print_json(headers: list, rows: list, max_rows: int | None = None) -> None:
+def _print_json(headers, rows, max_rows=None):
+    # type: (List[str], List[list], Optional[int]) -> None
     """Print rows as pretty JSON."""
     if max_rows is not None:
         rows = rows[:max_rows]
@@ -101,7 +111,8 @@ def _print_json(headers: list, rows: list, max_rows: int | None = None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser():
+    # type: () -> argparse.ArgumentParser
     parser = argparse.ArgumentParser(
         prog="cryptocmd",
         description=(
@@ -118,25 +129,28 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # --- Required ---
+    # Required
     parser.add_argument(
-        "-c", "--coin",
+        "-c",
+        "--coin",
         required=True,
         metavar="COIN_CODE",
         help="Coin ticker symbol, e.g. BTC, ETH, SOL.",
     )
 
-    # --- Date range ---
+    # Date range
     date_group = parser.add_argument_group("Date range")
     date_group.add_argument(
-        "-f", "--from-date",
+        "-f",
+        "--from-date",
         dest="start_date",
         metavar="DD-MM-YYYY",
         type=_validate_date,
         help="Start date (inclusive). Format: dd-mm-yyyy.",
     )
     date_group.add_argument(
-        "-t", "--to-date",
+        "-t",
+        "--to-date",
         dest="end_date",
         metavar="DD-MM-YYYY",
         type=_validate_date,
@@ -149,10 +163,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fetch all available historical data (overrides -f / -t).",
     )
 
-    # --- Output options ---
+    # Output options
     output_group = parser.add_argument_group("Output")
     output_group.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         default="table",
         metavar="FORMAT",
         help=(
@@ -165,25 +180,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--save",
         action="store_true",
         default=False,
-        help="Save data to a file instead of printing. Requires a file-based --output format.",
+        help=(
+            "Save data to a file instead of printing. "
+            "Requires a file-based --output format."
+        ),
     )
     output_group.add_argument(
-        "-p", "--path",
+        "-p",
+        "--path",
         dest="output_path",
         default=None,
         metavar="DIR",
         help="Directory where the output file will be saved. Defaults to current directory.",
     )
     output_group.add_argument(
-        "-n", "--name",
+        "-n",
+        "--name",
         dest="output_name",
         default=None,
         metavar="FILENAME",
         help="Custom filename for the saved file (without extension).",
     )
 
-    # --- Filtering & ordering ---
-    filter_group = parser.add_argument_group("Filtering & ordering")
+    # Filtering & ordering
+    filter_group = parser.add_argument_group("Filtering and ordering")
     filter_group.add_argument(
         "--rows",
         type=int,
@@ -214,42 +234,41 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
-    # --- Misc ---
+    # Misc
     parser.add_argument(
-        "-v", "--version",
+        "-v",
+        "--version",
         action="version",
-        version=f"%(prog)s {__version__}",
+        version="%(prog)s {}".format(__version__),
     )
 
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv=None):
+    # type: (Optional[List[str]]) -> int
     """
     Main entry point for the ``cryptocmd`` CLI command.
 
-    Returns
-    -------
-    int
-        Exit code: 0 on success, non-zero on failure.
+    :param argv: argument list (defaults to sys.argv when None).
+    :return: exit code (0 on success, non-zero on failure).
     """
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    # --- Validate argument combinations ---
     output_fmt = args.output.lower()
 
     if args.save and output_fmt in ("table", "json"):
         parser.error(
             "--save requires a file-based output format. "
-            f"Choose one of: {', '.join(SUPPORTED_EXPORT_FORMATS)}"
+            "Choose one of: {}".format(", ".join(SUPPORTED_EXPORT_FORMATS))
         )
 
+    # Silently enable save when a file format is requested without --save flag
     if not args.save and output_fmt not in ("table", "json"):
-        # Silently enable save when a file format is requested without --save
         args.save = True
 
-    # --- Build scraper ---
+    # Build scraper
     try:
         scraper = CmcScraper(
             coin_code=args.coin.upper(),
@@ -260,29 +279,36 @@ def main(argv: list[str] | None = None) -> int:
             fiat=args.fiat.upper(),
             coin_name=args.coin_name,
         )
-    except Exception as exc:  # noqa: BLE001
-        print(f"Error initialising scraper: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print("Error initialising scraper: {}".format(exc), file=sys.stderr)
         return 1
 
-    # --- Fetch data ---
+    # Progress indicator
+    if args.all_time or not (args.start_date and args.end_date):
+        date_range = "all-time"
+    else:
+        date_range = "{} to {}".format(args.start_date, args.end_date)
     print(
-        f"Fetching {args.coin.upper()}/{args.fiat.upper()} data "
-        f"({'all-time' if args.all_time or not (args.start_date and args.end_date) else args.start_date + ' – ' + args.end_date})"
-        f" …",
+        "Fetching {}/{} data ({}) ...".format(
+            args.coin.upper(), args.fiat.upper(), date_range
+        ),
         file=sys.stderr,
     )
 
+    # Fetch data
     try:
         headers, rows = scraper.get_data()
-    except Exception as exc:  # noqa: BLE001
-        print(f"Error fetching data: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print("Error fetching data: {}".format(exc), file=sys.stderr)
         return 1
 
     if not rows:
-        print("No data returned for the requested coin/date range.", file=sys.stderr)
+        print(
+            "No data returned for the requested coin/date range.", file=sys.stderr
+        )
         return 1
 
-    # --- Output ---
+    # Output
     if args.save:
         try:
             scraper.export(
@@ -290,14 +316,18 @@ def main(argv: list[str] | None = None) -> int:
                 name=args.output_name,
                 path=args.output_path or os.getcwd(),
             )
-            out_dir = args.output_path or os.getcwd()
-            print(f"Saved {output_fmt.upper()} file to: {out_dir}", file=sys.stderr)
-        except Exception as exc:  # noqa: BLE001
-            print(f"Error saving file: {exc}", file=sys.stderr)
+            print(
+                "Saved {} file to: {}".format(
+                    output_fmt.upper(), args.output_path or os.getcwd()
+                ),
+                file=sys.stderr,
+            )
+        except Exception as exc:
+            print("Error saving file: {}".format(exc), file=sys.stderr)
             return 1
     elif output_fmt == "json":
         _print_json(headers, rows, max_rows=args.rows)
-    else:  # table (default)
+    else:
         _print_table(headers, rows, max_rows=args.rows)
 
     return 0
