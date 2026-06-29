@@ -31,7 +31,6 @@ import json
 import os
 import sys
 from datetime import datetime
-from typing import List, Optional
 
 from .__version__ import __version__
 from .core import CmcScraper
@@ -75,7 +74,7 @@ def _validate_date(date_str):
 
 
 def _print_table(headers, rows, max_rows=None):
-    # type: (List[str], List[list], Optional[int]) -> None
+    # type: (list, list, int | None) -> None
     """Pretty-print rows as an aligned ASCII table."""
     if max_rows is not None:
         rows = rows[:max_rows]
@@ -98,7 +97,7 @@ def _print_table(headers, rows, max_rows=None):
 
 
 def _print_json(headers, rows, max_rows=None):
-    # type: (List[str], List[list], Optional[int]) -> None
+    # type: (list, list, int | None) -> None
     """Print rows as pretty JSON."""
     if max_rows is not None:
         rows = rows[:max_rows]
@@ -246,7 +245,7 @@ def build_parser():
 
 
 def main(argv=None):
-    # type: (Optional[List[str]]) -> int
+    # type: (list | None) -> int
     """
     Main entry point for the ``cryptocmd`` CLI command.
 
@@ -260,8 +259,9 @@ def main(argv=None):
 
     if args.save and output_fmt in ("table", "json"):
         parser.error(
-            "--save requires a file-based output format. "
-            "Choose one of: {}".format(", ".join(SUPPORTED_EXPORT_FORMATS))
+            "--save requires a file-based output format. " "Choose one of: {}".format(
+                ", ".join(SUPPORTED_EXPORT_FORMATS)
+            )
         )
 
     # Silently enable save when a file format is requested without --save flag
@@ -303,9 +303,7 @@ def main(argv=None):
         return 1
 
     if not rows:
-        print(
-            "No data returned for the requested coin/date range.", file=sys.stderr
-        )
+        print("No data returned for the requested coin/date range.", file=sys.stderr)
         return 1
 
     # Output
